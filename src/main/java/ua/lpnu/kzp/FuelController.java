@@ -10,7 +10,7 @@ import java.util.Locale;
 
 public class FuelController {
 
-    public void run(AppArguments args) {
+public void run(AppArguments args) {
         Path input = Path.of(args.inputPath());
         Path output = Path.of(args.outputPath());
 
@@ -24,22 +24,23 @@ public class FuelController {
 
         List<FuelTransaction> transactions = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        double sumPricePerLiter = 0.0;
 
         for (int index = 0; index < lines.size(); index++) {
             try {
-                // Перевірка і створення об'єкта відбувається ТУТ[cite: 48, 49]
-                FuelTransaction transaction = FuelTransaction.fromCsv(lines.get(index));
+                // Використовуємо нову фабрику замість FuelTransaction.fromCsv
+                FuelTransaction transaction = TransactionFactory.fromCsv(lines.get(index));
                 transactions.add(transaction);
-                sumPricePerLiter += transaction.getPricePerLiter();
             } catch (IllegalArgumentException exception) {
                 errors.add(String.format(Locale.ROOT, "Рядок %d: %s", index + 1, exception.getMessage()));
             }
         }
 
         double totalLiters = transactions.stream().mapToDouble(FuelTransaction::getLiters).sum();
-        double totalCost = transactions.stream().mapToDouble(t -> t.getLiters() * t.getPricePerLiter()).sum();
-        double avgPrice = transactions.isEmpty() ? 0.0 : sumPricePerLiter / transactions.size();
+        
+        // Використовуємо поліморфний метод calculateCost замість старого getPricePerLiter
+        double totalCost = transactions.stream().mapToDouble(FuelTransaction::calculateCost).sum();
+        
+        double avgPrice = totalLiters == 0 ? 0 : totalCost / totalLiters;
 
         FuelSummary summary = new FuelSummary(transactions.size(), totalLiters, totalCost, avgPrice);
         writeReport(summary, errors, output);

@@ -3,65 +3,81 @@ package ua.lpnu.kzp;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Описує коректний транзакційний запис на заправці. */
-public final class FuelTransaction {
-    private final String fuel;
-    private final double liters;
-    private final double pricePerLiter;
+/** Спільний абстрактний тип для транзакцій заправки. */
+public abstract class FuelTransaction {
     private final String date;
     private final int column;
+    private final FuelKind kind;
+    private final double liters;
 
-    /**
-     * Конструктор з перевіркою інваріантів[cite: 46].
-     */
-    public FuelTransaction(String fuel, double liters, double pricePerLiter, String date, int column) {
-        this.fuel = Objects.requireNonNull(fuel, "Тип пального не може бути null");
-        this.date = Objects.requireNonNull(date, "Дата не може бути null");
-
-        if (fuel.isBlank() || date.isBlank()) {
-            throw new IllegalArgumentException("Тип пального або дата не можуть бути порожніми");
-        }
-        if (liters < 0 || pricePerLiter < 0 || column < 0) {
-            throw new IllegalArgumentException("Літри, ціна та номер колонки мають бути не від'ємними");
-        }
-        if (!Double.isFinite(liters) || !Double.isFinite(pricePerLiter)) {
-            throw new IllegalArgumentException("Числові значення мають бути скінченними");
-        }
-
-        this.liters = liters;
-    this.pricePerLiter = pricePerLiter;
-    this.column = column;
+    /** Створює транзакцію з перевіреними базовими полями. */
+    protected FuelTransaction(String date, int column, FuelKind kind, double liters) {
+        // Викликаємо статичні методи для перевірки до того, як присвоїти поля
+        this.date = validateDate(date);
+        this.kind = Objects.requireNonNull(kind, "Категорія пального не може бути null");
+        this.column = validateColumn(column);
+        this.liters = validateLiters(liters);
     }
 
-    /**
-     * Статичний фабричний метод для розбору CSV-рядка[cite: 47, 48].
-     */
-    public static FuelTransaction fromCsv(String line) {
-        Objects.requireNonNull(line, "Рядок не може бути null");
-        String[] fields = line.split(";", -1);
-        
-        if (fields.length != 5) {
-            throw new IllegalArgumentException("Очікується рівно 5 полів");
+    private static String validateDate(String date) {
+        Objects.requireNonNull(date, "Дата не може бути null");
+        if (date.isBlank()) {
+            throw new IllegalArgumentException("Дата не може бути порожньою");
         }
-        try {
-            return new FuelTransaction(
-                fields[0].trim(),
-                Double.parseDouble(fields[1].trim()),
-                Double.parseDouble(fields[2].trim()),
-                fields[3].trim(),
-                Integer.parseInt(fields[4].trim())
-            );
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException("Числове поле має помилковий формат", exception);
-        }
+        return date;
     }
 
-    public double getLiters() { return liters; }
-    public double getPricePerLiter() { return pricePerLiter; }
+    private static int validateColumn(int column) {
+        if (column < 0) {
+            throw new IllegalArgumentException("Номер колонки має бути не від'ємним");
+        }
+        return column;
+    }
+
+    private static double validateLiters(double liters) {
+        if (liters < 0 || !Double.isFinite(liters)) {
+            throw new IllegalArgumentException("Літри мають бути не від'ємними та скінченними");
+        }
+        return liters;
+    }
+
+    public final String getDate() { return date; }
+    public final int getColumn() { return column; }
+    public final FuelKind getKind() { return kind; }
+    public final double getLiters() { return liters; }
+
+    /** Поліморфний метод: обчислює вартість пального. */
+    public abstract double calculateCost();
+
+    @Override
+    public final boolean equals(Object other) {
+        if (this == other) return true;
+        if (other == null || getClass() != other.getClass()) return false;
+        FuelTransaction that = (FuelTransaction) other;
+        return column == that.column &&
+               Double.compare(that.liters, liters) == 0 &&
+               date.equals(that.date);
+    }
+
+    @Override
+    public final int hashCode() {
+        return Objects.hash(getClass(), date, column, liters);
+    }
 
     @Override
     public String toString() {
-        return String.format(Locale.ROOT, "%s: %.2f л по %.2f грн, колонка %d (%s)", 
-                             fuel, liters, pricePerLiter, column, date);
+        return String.format(Locale.ROOT, "%s (Колонка %d): %.2f л - %.2f грн", 
+                             kind.label(), column, liters, calculateCost());
+
+    }
+    /**
+     * Заглушка фіналізатора для уникнення попереджень SpotBugs (CT_CONSTRUCTOR_THROW).
+     */
+    @Override
+    @SuppressWarnings("removal")
+    protected final void finalize() throws Throwable {
+        if (this.date == null) {
+            super.finalize();
+        }
     }
 }
