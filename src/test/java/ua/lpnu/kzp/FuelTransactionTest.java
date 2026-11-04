@@ -1,42 +1,41 @@
 package ua.lpnu.kzp;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class FuelTransactionTest {
 
     @Test
-    void fromCsvCreatesValidEntity() { // AAA Pattern[cite: 49]
-        FuelTransaction ft = FuelTransaction.fromCsv("Дизель; 40.5; 52.00; 2026-10-15; 1");
+    void subtypesCalculateCostDifferently() {
+        FuelTransaction petrol = new PetrolTransaction("2026-10-15", 1, 150, 50.0, true); // Знижка 2%
+        FuelTransaction diesel = new DieselTransaction("2026-10-15", 1, 150, 50.0, true); // Знижка 5%
         
-        assertEquals(40.5, ft.getLiters(), 0.0001);
-        assertEquals(52.00, ft.getPricePerLiter(), 0.0001);
+        assertNotEquals(petrol.calculateCost(), diesel.calculateCost());
+        assertEquals(7350.0, petrol.calculateCost(), 0.001); // 150 * 50 * 0.98
+        assertEquals(7125.0, diesel.calculateCost(), 0.001); // 150 * 50 * 0.95
     }
 
     @Test
-    void constructorRejectsNegativeLiters() {
-        assertThrows(IllegalArgumentException.class, 
-            () -> new FuelTransaction("Газ", -10.0, 28.00, "2026-10-15", 1));
+    void equalObjectsHaveOneSetEntry() {
+        Set<FuelTransaction> items = new HashSet<>();
+        items.add(new PetrolTransaction("2026-10-15", 1, 50, 50.0, false));
+        items.add(new PetrolTransaction("2026-10-15", 1, 50, 50.0, false));
+        
+        assertEquals(1, items.size());
     }
 
     @Test
-    void fromCsvRejectsInvalidNumber() {
+    void subtypeRejectsInvalidSpecificValue() {
         assertThrows(IllegalArgumentException.class, 
-            () -> FuelTransaction.fromCsv("А-95; помилка; 55.50; 2026-10-16; 2"));
-    }
-
-    @Test
-    void fromCsvRejectsWrongNumberOfFields() {
-        assertThrows(IllegalArgumentException.class, 
-            () -> FuelTransaction.fromCsv("Газ; 30.0; 28.00; 2026-10-16")); // Лише 4 поля
+            () -> new DieselTransaction("2026-10-15", 1, 50, -50.0, false));
     }
     
     @Test
-    void recordUsesValueEquality() {
-        FuelSummary first = new FuelSummary(3, 95.5, 4333.5, 45.17);
-        FuelSummary second = new FuelSummary(3, 95.5, 4333.5, 45.17);
-        assertEquals(first, second);
+    void factoryRejectsInvalidFormat() {
+        assertThrows(IllegalArgumentException.class, 
+            () -> TransactionFactory.fromCsv("Газ;50;50;2026-10-15;1;false")); // Невідомий тип
     }
 }
